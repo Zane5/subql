@@ -4,12 +4,11 @@
 import path from 'path';
 import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { ApiPromise } from '@polkadot/api';
-import { buildSchema, getAllEntities, SubqlKind } from '@subql/common';
+import { buildSchema, SubqlKind } from '@subql/common';
 import { QueryTypes, Sequelize } from 'sequelize';
 import { NodeConfig } from '../configure/NodeConfig';
 import { SubqueryProject } from '../configure/project.model';
 import { SubqueryModel, SubqueryRepo } from '../entities';
-import { objectTypeToModelAttributes } from '../utils/graphql';
 import * as SubstrateUtil from '../utils/substrate';
 import { ApiService } from './api.service';
 import { FetchService } from './fetch.service';
@@ -162,11 +161,7 @@ export class IndexerManager implements OnApplicationBootstrap {
     const graphqlSchema = buildSchema(
       path.join(this.project.path, this.project.schema),
     );
-    const models = getAllEntities(graphqlSchema).map((entity) => {
-      const modelAttributes = objectTypeToModelAttributes(entity);
-      return { name: entity.name, attributes: modelAttributes };
-    });
-    await this.storeService.syncSchema(models, schema);
+    await this.storeService.syncSchema(graphqlSchema, schema);
   }
 
   private async nextSubquerySchemaSuffix(): Promise<number> {

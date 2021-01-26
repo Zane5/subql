@@ -1,7 +1,13 @@
 // Copyright 2020-2021 OnFinality Limited authors & contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import { GraphQLObjectType, GraphQLOutputType, isNonNullType } from 'graphql';
+import {
+  GraphQLObjectType,
+  GraphQLOutputType,
+  isNonNullType,
+  GraphQLDirective,
+  getDirectiveValues,
+} from 'graphql';
 import { ModelAttributes } from 'sequelize';
 import { ModelAttributeColumnOptions } from 'sequelize/types/lib/model';
 
@@ -24,12 +30,25 @@ export function objectTypeToModelAttributes(
   return Object.entries(fields).reduce((acc, [k, v]) => {
     let type: GraphQLOutputType = v.type;
     let allowNull = true;
+    const name = k;
+
     if (isNonNullType(type)) {
       type = type.ofType;
       allowNull = false;
     }
+
+    if (/^\[(.+)\]$/.test(type.toString())) {
+      // skip list type for relation definition
+      return acc;
+    }
+
+    const dbType = SEQUELIZE_TYPE_MAPPING[type.toString()];
+    if (!dbType) {
+      return acc;
+    }
+
     const columnOption: ModelAttributeColumnOptions<any> = {
-      type: SEQUELIZE_TYPE_MAPPING[type.toString()],
+      type: dbType,
       allowNull,
       primaryKey: type.toString() === 'ID',
     };
@@ -39,10 +58,14 @@ export function objectTypeToModelAttributes(
         return dataValue ? BigInt(dataValue) : null;
       };
       columnOption.set = function (val: unknown) {
-        this.setDataValue(k, val?.toString());
+        this.setDataValue(name, val?.toString());
       };
     }
-    acc[k] = columnOption;
+    acc[name] = columnOption;
     return acc;
   }, {} as ModelAttributes<any>);
+}
+
+export function isBasicType(t: string): boolean {
+  return Object.keys(SEQUELIZE_TYPE_MAPPING).findIndex((k) => k === t) >= 0;
 }
