@@ -10,6 +10,7 @@ import { Sequelize, Transaction } from 'sequelize';
 import { isBasicType, objectTypeToModelAttributes } from '../utils/graphql';
 import {
   commentConstraintQuery,
+  createUniqueIndexQuery,
   getFkConstraint,
   smartTags,
 } from '../utils/sync-helper';
@@ -56,8 +57,27 @@ export class StoreService {
           }
           const relatedModel = this.sequelize.model(t.toString());
           if (values) {
-            // todo: 1to1 relation
-            // model.hasOne(relatedModel, {foreignKey: `${values.field}Id`});
+            // 1to1 relation
+            const rel = model.hasOne(relatedModel, {
+              foreignKey: `${values.field}Id`,
+            });
+            const fkConstraint = getFkConstraint(
+              rel.target.tableName,
+              rel.foreignKey,
+            );
+            const tags = smartTags({ singleForeignFieldName: k });
+            extraQueries.push(
+              commentConstraintQuery(
+                `${schema}.${rel.target.tableName}`,
+                fkConstraint,
+                tags,
+              ),
+              createUniqueIndexQuery(
+                schema,
+                relatedModel.tableName,
+                `${values.field}Id`,
+              ),
+            );
           } else {
             model.belongsTo(relatedModel, { foreignKey: `${k}Id` });
           }
